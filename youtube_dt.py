@@ -341,11 +341,6 @@ def insert_multiple_playlist_details(channel_ids):
 
 
 
-
-
-
-
-
 def insert_multiple_video_details(channel_ids):
     for channel_id in channel_ids:
         video_ids = get_videos_ids(channel_id)
@@ -353,9 +348,29 @@ def insert_multiple_video_details(channel_ids):
         video_details = get_video_info(video_ids)
         
         for video_data in video_details:
+            # Convert ISO 8601 duration to seconds
+            duration = video_data['Duration']
+            total_seconds = 0
+            
+            if duration:
+                duration = duration.replace('PT', '')
+                if 'H' in duration:
+                    hours = int(duration.split('H')[0])
+                    total_seconds += hours * 3600
+                    duration = duration.split('H')[1]
+                if 'M' in duration:
+                    minutes = int(duration.split('M')[0])
+                    total_seconds += int(duration.split('M')[0]) * 60
+                    duration = duration.split('M')[1]
+                if 'S' in duration:
+                    seconds = int(duration.split('S')[0])
+                    total_seconds += int(duration.split('S')[0])
+            
+            # Update video_data with total_seconds
+            video_data['Duration'] = total_seconds
+            
+            # Proceed with insertion into MySQL
             published_date = datetime.strptime(video_data['Published_Date'], '%Y-%m-%dT%H:%M:%SZ').strftime('%Y-%m-%d %H:%M:%S')
-
-
 
             mycursor.execute("SELECT Video_Id FROM videos WHERE Video_Id = %s", (video_data['Video_Id'],))
             existing_video = mycursor.fetchone()
@@ -388,7 +403,7 @@ def insert_multiple_video_details(channel_ids):
                     video_data['Thumbnail'],
                     video_data['Description'],
                     published_date,
-                    video_data['Duration'],
+                    total_seconds,  # Updated to total_seconds
                     video_data['Views'],
                     video_data['Likes'],
                     video_data['Comments'],
@@ -400,8 +415,8 @@ def insert_multiple_video_details(channel_ids):
                 mydb.commit()
 
                 print(f"Video with ID {video_data['Video_Id']} inserted successfully.")
-
-
+            # Print video data after duration conversion for debugging
+            print(f"Video data after conversion: {video_data}")
 
 
 
@@ -580,14 +595,19 @@ elif select == "EXTRACTION AND TRANSFORM":
     channel_id = st.text_input("Enter :red[YouTube] Channel ID:")
     if st.button(":green[Extract Data]"):
         if channel_id:
-            try:
-                insert_multiple_channel_details([channel_id])
-                insert_multiple_playlist_details([channel_id])
-                insert_multiple_video_details([channel_id])
-                insert_multiple_comment_details([channel_id])
-                st.success("Data extraction successful!")
-            except Exception as e:
-                st.error(f"Error occurred: {e}")
+            # Check if the channel ID already exists in the database
+            channels_df = get_channels_df()
+            if channel_id in channels_df['Channel_Id'].values:
+                st.warning(f"This channel {channel_id} already exists in the database.")
+            else:
+                try:
+                    insert_multiple_channel_details([channel_id])
+                    insert_multiple_playlist_details([channel_id])
+                    insert_multiple_video_details([channel_id])
+                    insert_multiple_comment_details([channel_id])
+                    st.success("Data extraction successful!")
+                except Exception as e:
+                    st.error(f"Error occurred: {e}")
         else:
             st.warning("Please enter a valid Channel ID.")
 
@@ -614,6 +634,7 @@ elif select == "EXTRACTION AND TRANSFORM":
 
         st.subheader(":red[Comment Details]")
         st.write(comment_data)
+
 
 
 elif select == "SQL DATABASE":
