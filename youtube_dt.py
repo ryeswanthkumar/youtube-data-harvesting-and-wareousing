@@ -1,5 +1,4 @@
 from googleapiclient.discovery import build
-import mysql.connector
 import pandas as pd
 import streamlit as st
 import MySQLdb
@@ -502,6 +501,13 @@ videos_df = get_videos_df()
 comments_df = get_comments_df()
 
 
+# Function to convert seconds to hh:mm:ss format
+def seconds_to_hms(seconds):
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    return f"{int(hours)}hr : {int(minutes)}min : {int(seconds)}sec"
+
 
 
 #======================================================= STREAMLIT PART =========================================================================#
@@ -668,10 +674,10 @@ elif select == "SQL DATABASE":
         st.subheader(":red[Comment Details]")
         st.write(pd.DataFrame(comments_data, columns=[desc[0] for desc in mycursor.description]))
 
-
+    
 
 elif select == "VIEW":
-    # 10 Questions
+    
     questions = [
         "All the videos and the channel name",
         "Channels with the most number of videos",
@@ -710,5 +716,9 @@ elif select == "VIEW":
             query = "SELECT Title, Comments FROM videos ORDER BY Comments DESC LIMIT 1"
 
         result_df = execute_query(query)
+
+        if selected_question == questions[8]:
+            result_df['Avg_Duration'] = result_df['Avg_Duration'].apply(seconds_to_hms)
+
         st.subheader(selected_question)
         st.write(result_df)
